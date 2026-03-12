@@ -18,12 +18,18 @@ import json
 import re
 import sqlite3
 import threading
+import sys
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 from telethon import TelegramClient, events, Button
 from telethon.tl.types import MessageEntityTextUrl
 from telethon.errors import FloodWaitError, RPCError
 from flask import Flask, request
+
+# =============== FIX FOR PYTHON 3.14 ===============
+# Event loop policy fix for Python 3.14+
+if sys.version_info >= (3, 14):
+    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
 
 # =============== CONFIG ===============
 BOT_TOKEN = os.environ.get('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
@@ -225,8 +231,13 @@ def get_bot_stats():
         'active_today': active_today
     }
 
-# =============== BOT CLIENT ===============
-bot = TelegramClient('nick_bomber_bot', api_id=6, api_hash='eb06d4abfb49dc3eeb1aeb98ae0f581e')
+# =============== FIXED BOT CLIENT FOR PYTHON 3.14 ===============
+# Create event loop properly
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
+# Initialize bot with existing loop
+bot = TelegramClient('nick_bomber_bot', api_id=6, api_hash='eb06d4abfb49dc3eeb1aeb98ae0f581e', loop=loop)
 bot.start(bot_token=BOT_TOKEN)
 
 # =============== FLASK APP FOR RENDER ===============
@@ -333,7 +344,7 @@ class BomberEngine:
                     else:
                         failed += 1
                 
-                await asyncio.sleep(0.5)  # Speed increase (0.5 sec)
+                await asyncio.sleep(0.5)
                 
             except Exception as e:
                 failed += 1
@@ -398,8 +409,7 @@ class BomberEngine:
                         f"Progress: {i+1}/{count} ({progress:.1f}%)\n"
                         f"━━━━━━━━━━━━━━━━━━━\n"
                         f"🟢 Sent: {successful}\n"
-                        f"🔴 Failed: {failed}\n"
-                        f"⚡ Speed: {(i+1)/((i+1)*0.5):.1f}/sec",
+                        f"🔴 Failed: {failed}\n",
                         parse_mode='md'
                     )
                 
@@ -453,7 +463,7 @@ class BomberEngine:
                     else:
                         failed += 1
                 
-                await asyncio.sleep(1.5)  # 1.5 sec gap
+                await asyncio.sleep(1.5)
                 
             except Exception as e:
                 failed += 1
@@ -546,7 +556,7 @@ class BomberEngine:
 
 bomber = BomberEngine()
 
-# =============== TELEGRAM HANDLERS ===============
+# =============== FIXED TELEGRAM HANDLERS (with raw strings for regex) ===============
 @bot.on(events.NewMessage(pattern='/start'))
 async def start_handler(event):
     """Start command handler"""
@@ -635,7 +645,8 @@ async def verify_join_handler(event):
         alert=True
     )
 
-@bot.on(events.NewMessage(pattern='/sms(?: |@{}|)(?: +)?(\d{10,12})?(?: +)?(\d*)?'.format(BOT_USERNAME)))
+# FIXED: Raw strings for regex patterns
+@bot.on(events.NewMessage(pattern=rf'/sms(?: |@{BOT_USERNAME}|)(?: +)?(\d{{10,12}})?(?: +)?(\d*)?'))
 async def sms_bomb_handler(event):
     """SMS bombing handler - UNLIMITED"""
     user_id = event.sender_id
@@ -673,7 +684,7 @@ async def sms_bomb_handler(event):
     # Warnings for large numbers
     if bomb_count > 5000:
         buttons = [
-            [Button.inline(f'💀 Ha Maharaj, {bomb_count} karo', f'confirm_sms_{phone}_{bomb_count}')],
+            [Button.inline(f'💀 Ha Maharaj, {bomb_count} karo', f'confirm_sms_{phone}_{bomb_count}'.encode())],
             [Button.inline('❌ Cancel', 'cancel_bomb')]
         ]
         await event.reply(
@@ -689,7 +700,7 @@ async def sms_bomb_handler(event):
         return
     elif bomb_count > 1000:
         buttons = [
-            [Button.inline(f'✅ Ha, {bomb_count} karo', f'confirm_sms_{phone}_{bomb_count}')],
+            [Button.inline(f'✅ Ha, {bomb_count} karo', f'confirm_sms_{phone}_{bomb_count}'.encode())],
             [Button.inline('❌ Cancel', 'cancel_bomb')]
         ]
         await event.reply(
@@ -705,7 +716,7 @@ async def sms_bomb_handler(event):
     # Direct execute
     await execute_sms_bomb(event, phone, bomb_count, user_id)
 
-@bot.on(events.CallbackQuery(pattern=b'confirm_sms_(\\d+)_(\\d+)'))
+@bot.on(events.CallbackQuery(pattern=b'confirm_sms_(\d+)_(\d+)'))
 async def confirm_sms_handler(event):
     """Confirm SMS bombing"""
     data = event.data.decode()
@@ -756,13 +767,12 @@ async def execute_sms_bomb(event, phone, bomb_count, user_id):
         f"🔴 Failed: {result.get('failed', 0)}\n"
         f"📊 Success: {success_rate:.1f}%\n"
         f"⏱️ Time: {elapsed}s\n"
-        f"⚡ Speed: {result.get('successful', 0)/elapsed:.1f}/sec\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"**Powered by NICK AI - UNLIMITED** 😈🔥",
         parse_mode='md'
     )
 
-@bot.on(events.NewMessage(pattern='/call(?: |@{}|)(?: +)?(\d{10,12})?(?: +)?(\d*)?'.format(BOT_USERNAME)))
+@bot.on(events.NewMessage(pattern=rf'/call(?: |@{BOT_USERNAME}|)(?: +)?(\d{{10,12}})?(?: +)?(\d*)?'))
 async def call_bomb_handler(event):
     """Call bombing handler - UNLIMITED"""
     user_id = event.sender_id
@@ -800,7 +810,7 @@ async def call_bomb_handler(event):
     # Warnings
     if bomb_count > 2000:
         buttons = [
-            [Button.inline(f'💀 Ha Maharaj, {bomb_count} calls', f'confirm_call_{phone}_{bomb_count}')],
+            [Button.inline(f'💀 Ha Maharaj, {bomb_count} calls', f'confirm_call_{phone}_{bomb_count}'.encode())],
             [Button.inline('❌ Cancel', 'cancel_bomb')]
         ]
         await event.reply(
@@ -816,7 +826,7 @@ async def call_bomb_handler(event):
         return
     elif bomb_count > 500:
         buttons = [
-            [Button.inline(f'✅ Ha, {bomb_count} calls', f'confirm_call_{phone}_{bomb_count}')],
+            [Button.inline(f'✅ Ha, {bomb_count} calls', f'confirm_call_{phone}_{bomb_count}'.encode())],
             [Button.inline('❌ Cancel', 'cancel_bomb')]
         ]
         await event.reply(
@@ -831,7 +841,7 @@ async def call_bomb_handler(event):
     
     await execute_call_bomb(event, phone, bomb_count, user_id)
 
-@bot.on(events.CallbackQuery(pattern=b'confirm_call_(\\d+)_(\\d+)'))
+@bot.on(events.CallbackQuery(pattern=b'confirm_call_(\d+)_(\d+)'))
 async def confirm_call_handler(event):
     """Confirm call bombing"""
     data = event.data.decode()
@@ -886,7 +896,7 @@ async def execute_call_bomb(event, phone, bomb_count, user_id):
         parse_mode='md'
     )
 
-@bot.on(events.NewMessage(pattern='/hybrid(?: |@{}|)(?: +)?(\d{10,12})?'.format(BOT_USERNAME)))
+@bot.on(events.NewMessage(pattern=rf'/hybrid(?: |@{BOT_USERNAME}|)(?: +)?(\d{{10,12}})?'))
 async def hybrid_bomb_handler(event):
     """Hybrid bombing"""
     user_id = event.sender_id
@@ -915,10 +925,9 @@ async def hybrid_bomb_handler(event):
     
     # Ask for counts
     buttons = [
-        [Button.inline('💣 Light (50 SMS + 25 Calls)', b'hybrid_light_' + phone.encode())],
-        [Button.inline('🔥 Medium (100 SMS + 50 Calls)', b'hybrid_medium_' + phone.encode())],
-        [Button.inline('💀 Heavy (500 SMS + 200 Calls)', b'hybrid_heavy_' + phone.encode())],
-        [Button.inline('👑 Custom', b'hybrid_custom_' + phone.encode())]
+        [Button.inline('💣 Light (50 SMS + 25 Calls)', f'hybrid_light_{phone}'.encode())],
+        [Button.inline('🔥 Medium (100 SMS + 50 Calls)', f'hybrid_medium_{phone}'.encode())],
+        [Button.inline('💀 Heavy (500 SMS + 200 Calls)', f'hybrid_heavy_{phone}'.encode())],
     ]
     
     await event.reply(
@@ -929,7 +938,7 @@ async def hybrid_bomb_handler(event):
         parse_mode='md'
     )
 
-@bot.on(events.CallbackQuery(pattern=b'hybrid_(\\w+)_(\\d+)'))
+@bot.on(events.CallbackQuery(pattern=b'hybrid_(\w+)_(\d+)'))
 async def hybrid_choice_handler(event):
     """Handle hybrid choice"""
     data = event.data.decode()
@@ -945,7 +954,7 @@ async def hybrid_choice_handler(event):
     elif level == 'heavy':
         sms, calls = 500, 200
     else:
-        await event.answer("Custom coming soon!")
+        await event.answer("Invalid choice!")
         return
     
     await event.edit(f"✅ Starting HYBRID attack: {sms} SMS + {calls} calls...")
@@ -1134,13 +1143,14 @@ async def main():
 def run_flask():
     """Run Flask app"""
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 if __name__ == '__main__':
+    # Start Flask in separate thread
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
-    loop = asyncio.get_event_loop()
+    # Run bot in existing loop
     try:
         loop.run_until_complete(main())
     except KeyboardInterrupt:
