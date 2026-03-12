@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 ╔════════════════════════════════════════╗
-║     NICK BOMBER - PYTHON 3.14 FIX     ║
+║     NICK BOMBER - FINAL WORKING       ║
 ║         Owner: @NICKPAPAJI            ║
+║      PYTHON 3.14 COMPATIBLE           ║
 ╚════════════════════════════════════════╝
 """
 
@@ -17,34 +18,58 @@ from datetime import datetime
 from telethon import TelegramClient, events
 from flask import Flask
 
-# =============== FIX FOR PYTHON 3.14 ===============
-# Create event loop FIRST before anything else
+# =============== ABSOLUTE FIX FOR PYTHON 3.14 ===============
+# Yeh sabse pehle run hoga
+print("🔥 NICK BOMBER INITIALIZING...")
+
+# Force create event loop
 try:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    print("✅ Event loop created for Python 3.14")
+    print("✅ Event loop created")
 except Exception as e:
-    print(f"⚠️ Event loop warning: {e}")
+    print(f"⚠️ Loop creation warning: {e}")
+
+# Alternative fix - agar upar ka kaam na kare
+if not asyncio.get_event_loop().is_running():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
 # =============== CONFIG ===============
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')
 OWNER_ID = int(os.environ.get('OWNER_ID', 7860365469))
 
-print("🔥 NICK BOMBER STARTING...")
 print(f"Token exists: {'Yes' if BOT_TOKEN else 'No'}")
 
 if not BOT_TOKEN:
-    print("❌ BOT_TOKEN not set!")
+    print("❌ BOT_TOKEN not set in environment variables!")
     exit(1)
 
-# =============== BOT WITH EXPLICIT LOOP ===============
-try:
-    # Pass the loop to TelegramClient
-    bot = TelegramClient('bot', 6, 'eb06d4abfb49dc3eeb1aeb98ae0f581e', loop=loop)
-    bot.start(bot_token=BOT_TOKEN)
-    print("✅ Bot connected successfully!")
-except Exception as e:
-    print(f"❌ Bot connection failed: {e}")
+# =============== BOT INITIALIZATION WITH FIX ===============
+bot = None
+
+def init_bot():
+    global bot
+    try:
+        # Method 1: With explicit loop
+        bot = TelegramClient('bot', 6, 'eb06d4abfb49dc3eeb1aeb98ae0f581e', loop=loop)
+        bot.start(bot_token=BOT_TOKEN)
+        print("✅ Bot connected successfully!")
+        return True
+    except Exception as e1:
+        print(f"⚠️ Method 1 failed: {e1}")
+        try:
+            # Method 2: Without loop (let Telethon handle it)
+            bot = TelegramClient('bot', 6, 'eb06d4abfb49dc3eeb1aeb98ae0f581e')
+            bot.start(bot_token=BOT_TOKEN)
+            print("✅ Bot connected with method 2!")
+            return True
+        except Exception as e2:
+            print(f"❌ Bot connection failed: {e2}")
+            return False
+
+if not init_bot():
+    print("❌ Cannot continue without bot connection")
     exit(1)
 
 # =============== SIMPLE BOMBER ===============
@@ -70,7 +95,7 @@ class Bomber:
                     if resp.status == 200:
                         success += 1
                 await asyncio.sleep(0.3)
-            except:
+            except Exception as e:
                 pass
         return success
     
@@ -87,7 +112,7 @@ class Bomber:
                     if resp.status == 200:
                         success += 1
                 await asyncio.sleep(1)
-            except:
+            except Exception as e:
                 pass
         return success
     
@@ -110,7 +135,7 @@ def health():
 
 def run_flask():
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 # =============== HANDLERS ===============
 
@@ -198,28 +223,22 @@ async def hybrid_cmd(event):
         sms_count = min(sms_count, 100)
         call_count = min(call_count, 50)
         
-        msg = await event.reply(f"💥 Hybrid attack: {sms_count}SMS + {call_count}Calls to +{phone}")
+        msg = await event.reply(f"💥 Hybrid attack: {sms_count}SMS + {call_count}Calls")
         
         start = time.time()
-        
         sms_ok = await bomber.sms(phone, sms_count)
         await asyncio.sleep(1)
         call_ok = await bomber.call(phone, call_count)
-        
         elapsed = int(time.time() - start)
         
-        await msg.edit(
-            f"✅ Hybrid complete in {elapsed}s!\n"
-            f"📱 SMS: {sms_ok}/{sms_count}\n"
-            f"📞 Calls: {call_ok}/{call_count}"
-        )
+        await msg.edit(f"✅ Complete! SMS:{sms_ok}/{sms_count} Calls:{call_ok}/{call_count} in {elapsed}s")
     except Exception as e:
         await event.reply(f"❌ Error: {str(e)}")
 
 # =============== MAIN FUNCTION ===============
 async def main():
     print("="*50)
-    print("🔥 NICK BOMBER RUNNING 🔥")
+    print("🔥 NICK BOMBER - FINAL VERSION 🔥")
     print("="*50)
     print(f"👑 Owner: @NICKPAPAJI")
     print(f"🤖 Bot: @NickBomberRobot")
@@ -231,7 +250,7 @@ if __name__ == '__main__':
     # Start Flask in a thread
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    print("✅ Flask server started")
+    print("✅ Flask server started on port " + os.environ.get('PORT', '5000'))
     
     # Run bot with the existing loop
     try:
@@ -242,6 +261,8 @@ if __name__ == '__main__':
         print(f"❌ Error in main: {e}")
     finally:
         # Cleanup
-        loop.run_until_complete(bomber.close())
-        loop.close()
+        try:
+            loop.run_until_complete(bomber.close())
+        except:
+            pass
         print("✅ Cleanup complete")
