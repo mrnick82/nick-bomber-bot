@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ╔════════════════════════════════════════╗
-║     NICK BOMBER - RENDER FIXED        ║
+║     NICK BOMBER - PYTHON 3.14 FIX     ║
 ║         Owner: @NICKPAPAJI            ║
 ╚════════════════════════════════════════╝
 """
@@ -17,6 +17,15 @@ from datetime import datetime
 from telethon import TelegramClient, events
 from flask import Flask
 
+# =============== FIX FOR PYTHON 3.14 ===============
+# Create event loop FIRST before anything else
+try:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    print("✅ Event loop created for Python 3.14")
+except Exception as e:
+    print(f"⚠️ Event loop warning: {e}")
+
 # =============== CONFIG ===============
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')
 OWNER_ID = int(os.environ.get('OWNER_ID', 7860365469))
@@ -28,11 +37,12 @@ if not BOT_TOKEN:
     print("❌ BOT_TOKEN not set!")
     exit(1)
 
-# =============== BOT ===============
+# =============== BOT WITH EXPLICIT LOOP ===============
 try:
-    bot = TelegramClient('bot', 6, 'eb06d4abfb49dc3eeb1aeb98ae0f581e')
+    # Pass the loop to TelegramClient
+    bot = TelegramClient('bot', 6, 'eb06d4abfb49dc3eeb1aeb98ae0f581e', loop=loop)
     bot.start(bot_token=BOT_TOKEN)
-    print("✅ Bot connected!")
+    print("✅ Bot connected successfully!")
 except Exception as e:
     print(f"❌ Bot connection failed: {e}")
     exit(1)
@@ -112,6 +122,8 @@ async def start(event):
 ║      Owner: @NICKPAPAJI       ║
 ╚════════════════════════════════╝
 
+✅ Bot is working!
+
 Commands:
 /sms 91789xxxxxx 50
 /call 91789xxxxxx 20
@@ -130,15 +142,18 @@ async def sms_cmd(event):
         
         phone = re.sub(r'\D', '', parts[1])
         if len(phone) < 10:
-            return await event.reply("❌ Invalid phone")
+            return await event.reply("❌ Invalid phone number")
         
         count = int(parts[2]) if len(parts) > 2 else 50
         count = min(count, 200)
         
-        msg = await event.reply(f"📱 SMS: {count} to +{phone}")
+        msg = await event.reply(f"📱 Sending {count} SMS to +{phone}...")
+        
         start = time.time()
         success = await bomber.sms(phone, count)
-        await msg.edit(f"✅ Done! {success}/{count} in {int(time.time()-start)}s")
+        elapsed = int(time.time() - start)
+        
+        await msg.edit(f"✅ Complete! {success}/{count} SMS sent in {elapsed}s")
     except Exception as e:
         await event.reply(f"❌ Error: {str(e)}")
 
@@ -151,15 +166,18 @@ async def call_cmd(event):
         
         phone = re.sub(r'\D', '', parts[1])
         if len(phone) < 10:
-            return await event.reply("❌ Invalid phone")
+            return await event.reply("❌ Invalid phone number")
         
         count = int(parts[2]) if len(parts) > 2 else 20
         count = min(count, 100)
         
-        msg = await event.reply(f"📞 Calls: {count} to +{phone}")
+        msg = await event.reply(f"📞 Making {count} calls to +{phone}...")
+        
         start = time.time()
         success = await bomber.call(phone, count)
-        await msg.edit(f"✅ Done! {success}/{count} in {int(time.time()-start)}s")
+        elapsed = int(time.time() - start)
+        
+        await msg.edit(f"✅ Complete! {success}/{count} calls connected in {elapsed}s")
     except Exception as e:
         await event.reply(f"❌ Error: {str(e)}")
 
@@ -172,7 +190,7 @@ async def hybrid_cmd(event):
         
         phone = re.sub(r'\D', '', parts[1])
         if len(phone) < 10:
-            return await event.reply("❌ Invalid phone")
+            return await event.reply("❌ Invalid phone number")
         
         sms_count = int(parts[2]) if len(parts) > 2 else 50
         call_count = int(parts[3]) if len(parts) > 3 else 20
@@ -180,43 +198,50 @@ async def hybrid_cmd(event):
         sms_count = min(sms_count, 100)
         call_count = min(call_count, 50)
         
-        msg = await event.reply(f"💥 Hybrid: {sms_count}SMS + {call_count}Calls")
+        msg = await event.reply(f"💥 Hybrid attack: {sms_count}SMS + {call_count}Calls to +{phone}")
+        
         start = time.time()
         
         sms_ok = await bomber.sms(phone, sms_count)
         await asyncio.sleep(1)
         call_ok = await bomber.call(phone, call_count)
         
-        await msg.edit(f"✅ Done! SMS:{sms_ok}/{sms_count} Calls:{call_ok}/{call_count} in {int(time.time()-start)}s")
+        elapsed = int(time.time() - start)
+        
+        await msg.edit(
+            f"✅ Hybrid complete in {elapsed}s!\n"
+            f"📱 SMS: {sms_ok}/{sms_count}\n"
+            f"📞 Calls: {call_ok}/{call_count}"
+        )
     except Exception as e:
         await event.reply(f"❌ Error: {str(e)}")
 
-@bot.on(events.NewMessage)
-async def echo(event):
-    if not event.text.startswith('/'):
-        await event.reply("Use: /sms, /call, /hybrid")
-
-# =============== MAIN ===============
+# =============== MAIN FUNCTION ===============
 async def main():
     print("="*50)
     print("🔥 NICK BOMBER RUNNING 🔥")
     print("="*50)
-    print(f"Owner: @NICKPAPAJI")
-    print(f"Bot: @NickBomberRobot")
+    print(f"👑 Owner: @NICKPAPAJI")
+    print(f"🤖 Bot: @NickBomberRobot")
+    print(f"🐍 Python: 3.14 (event loop fixed)")
     print("="*50)
     await bot.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Start Flask
+    # Start Flask in a thread
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
+    print("✅ Flask server started")
     
-    # Run bot
+    # Run bot with the existing loop
     try:
-        asyncio.run(main())
+        loop.run_until_complete(main())
     except KeyboardInterrupt:
-        print("\n❌ Stopped")
+        print("\n❌ Bot stopped by user")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error in main: {e}")
     finally:
-        asyncio.run(bomber.close())
+        # Cleanup
+        loop.run_until_complete(bomber.close())
+        loop.close()
+        print("✅ Cleanup complete")
