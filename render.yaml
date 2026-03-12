@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: web
     name: nick-bomber-bot
     runtime: python
     plan: free
